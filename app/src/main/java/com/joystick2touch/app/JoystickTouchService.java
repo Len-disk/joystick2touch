@@ -46,11 +46,13 @@ public class JoystickTouchService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
+        TouchMapper.stopAllHolds();
         lastActionText = "Servicio interrumpido.";
     }
 
     @Override
     public boolean onUnbind(Intent intent) {
+        TouchMapper.stopAllHolds();
         if (instance == this) {
             instance = null;
         }
@@ -60,6 +62,7 @@ public class JoystickTouchService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        TouchMapper.stopAllHolds();
         if (instance == this) {
             instance = null;
         }
@@ -72,18 +75,28 @@ public class JoystickTouchService extends AccessibilityService {
         if (dev != null && dev.isExternal()) {
             Integer slot = TouchMapper.keyCodeToSlot(event.getKeyCode());
             if (slot != null) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-                    TouchMapper.triggerTap(slot, KeyEvent.keyCodeToString(event.getKeyCode()));
+                int action = event.getAction();
+                if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                    TouchMapper.startHold(
+                            event.getKeyCode(),
+                            slot,
+                            KeyEvent.keyCodeToString(event.getKeyCode()));
+                    return true;
+                } else if (action == KeyEvent.ACTION_UP) {
+                    TouchMapper.stopHold(event.getKeyCode());
+                    return true;
                 }
-                // Consumir el evento del botón mapeado para no interferir con la app destino
-                return true;
             }
         }
         return super.onKeyEvent(event);
     }
 
     public void tapAt(final float x, final float y) {
-        tapAt(x, y, String.format(Locale.US, "(%.1f, %.1f)", x, y));
+        tapAt(x, y, 70L, String.format(Locale.US, "(%.1f, %.1f)", x, y));
+    }
+
+    public void tapAt(final float x, final float y, final String label) {
+        tapAt(x, y, 70L, label);
     }
 
     public void tapAt(final float x, final float y, final String label) {
@@ -97,7 +110,7 @@ public class JoystickTouchService extends AccessibilityService {
             path.moveTo(x, y);
 
             GestureDescription.StrokeDescription stroke =
-                    new GestureDescription.StrokeDescription(path, 0L, 70L);
+                    new GestureDescription.StrokeDescription(path, 0L, Math.max(20L, durationMs));
 
             GestureDescription.Builder builder = new GestureDescription.Builder();
             builder.addStroke(stroke);
