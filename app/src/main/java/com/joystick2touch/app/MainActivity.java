@@ -757,4 +757,24 @@ public class MainActivity extends Activity {
 
         super.onDestroy();
     }
+
+		private void testCenterScreenTap() {
+		JoystickTouchService svc = JoystickTouchService.getInstance();
+		if (svc == null) {
+			log("Servicio inactivo.");
+			return;
+		}
+
+		android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+		float centerX = dm.widthPixels / 2f;
+		float centerY = dm.heightPixels / 2f;
+
+		log(String.format(java.util.Locale.US,
+				"Probando centro (%dx%d): (%.1f, %.1f)",
+				dm.widthPixels, dm.heightPixels, centerX, centerY));
+
+		// Puedes añadir un método tapAt(x, y, durationMs) en JoystickTouchService
+		svc.swipe(centerX, centerY, centerX, centerY, 80L);
+	}
+            
 }
