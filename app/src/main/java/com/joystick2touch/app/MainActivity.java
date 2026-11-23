@@ -697,53 +697,83 @@ public class MainActivity extends Activity {
     // -------------------------------------------------
 
     @Override
-    public boolean dispatchGenericMotionEvent(MotionEvent event) {
-        if (isControllerSource(event.getSource())
-                && event.getAction() == MotionEvent.ACTION_MOVE) {
+public boolean dispatchGenericMotionEvent(MotionEvent event) {
+    if (isControllerSource(event.getSource())
+            && event.getAction() == MotionEvent.ACTION_MOVE) {
 
-            float x = event.getAxisValue(MotionEvent.AXIS_X);
-            float y = event.getAxisValue(MotionEvent.AXIS_Y);
-            if (Math.hypot(x, y) < 0.20) {
-                x = event.getAxisValue(MotionEvent.AXIS_HAT_X);
-                y = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
-            }
-            TouchMapper.updateStick(x, y);
+        float x = event.getAxisValue(MotionEvent.AXIS_X);
+        float y = event.getAxisValue(MotionEvent.AXIS_Y);
+        double magXY = Math.hypot(x, y);
 
-            StringBuilder values = new StringBuilder();
-            values.append("Dispositivo: ")
-                    .append(event.getDevice() != null
-                            ? event.getDevice().getName()
-                            : "Desconocido");
+        float z = event.getAxisValue(MotionEvent.AXIS_Z);
+        float rz = event.getAxisValue(MotionEvent.AXIS_RZ);
+        double magZRZ = Math.hypot(z, rz);
 
-            int[] axes = {
-                    MotionEvent.AXIS_X,
-                    MotionEvent.AXIS_Y,
-                    MotionEvent.AXIS_Z,
-                    MotionEvent.AXIS_RZ,
-                    MotionEvent.AXIS_RX,
-                    MotionEvent.AXIS_RY,
-                    MotionEvent.AXIS_HAT_X,
-                    MotionEvent.AXIS_HAT_Y,
-                    MotionEvent.AXIS_LTRIGGER,
-                    MotionEvent.AXIS_RTRIGGER,
-                    MotionEvent.AXIS_BRAKE,
-                    MotionEvent.AXIS_GAS
-            };
+        float rx = event.getAxisValue(MotionEvent.AXIS_RX);
+        float ry = event.getAxisValue(MotionEvent.AXIS_RY);
+        double magRXRY = Math.hypot(rx, ry);
 
-            for (int axis : axes) {
-                float value = event.getAxisValue(axis);
-                values.append("\n")
-                        .append(MotionEvent.axisToString(axis))
-                        .append(": ")
-                        .append(String.format(Locale.US, "%.3f", value));
-            }
+        float hx = event.getAxisValue(MotionEvent.AXIS_HAT_X);
+        float hy = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
+        double magHat = Math.hypot(hx, hy);
 
-            eventInfo.setText(values.toString());
-            return true;
+        double bestMag = magXY;
+        float bestX = x;
+        float bestY = y;
+
+        if (magZRZ > bestMag) {
+            bestMag = magZRZ;
+            bestX = z;
+            bestY = rz;
+        }
+        if (magRXRY > bestMag) {
+            bestMag = magRXRY;
+            bestX = rx;
+            bestY = ry;
+        }
+        if (magHat > bestMag) {
+            bestMag = magHat;
+            bestX = hx;
+            bestY = hy;
         }
 
-        return super.dispatchGenericMotionEvent(event);
+        TouchMapper.updateStick(bestX, bestY);
+
+        StringBuilder values = new StringBuilder();
+        values.append("Dispositivo: ")
+                .append(event.getDevice() != null
+                        ? event.getDevice().getName()
+                        : "Desconocido");
+
+        int[] axes = {
+                MotionEvent.AXIS_X,
+                MotionEvent.AXIS_Y,
+                MotionEvent.AXIS_Z,
+                MotionEvent.AXIS_RZ,
+                MotionEvent.AXIS_RX,
+                MotionEvent.AXIS_RY,
+                MotionEvent.AXIS_HAT_X,
+                MotionEvent.AXIS_HAT_Y,
+                MotionEvent.AXIS_LTRIGGER,
+                MotionEvent.AXIS_RTRIGGER,
+                MotionEvent.AXIS_BRAKE,
+                MotionEvent.AXIS_GAS
+        };
+
+        for (int axis : axes) {
+            float value = event.getAxisValue(axis);
+            values.append("\n")
+                    .append(MotionEvent.axisToString(axis))
+                    .append(": ")
+                    .append(String.format(Locale.US, "%.3f", value));
+        }
+
+        eventInfo.setText(values.toString());
+        return true;
     }
+
+    return super.dispatchGenericMotionEvent(event);
+}
 
     private boolean isControllerSource(int source) {
         return (source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
