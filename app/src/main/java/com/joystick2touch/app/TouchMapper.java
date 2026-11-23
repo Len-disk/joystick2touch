@@ -11,9 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class TouchMapper {
 
-    private static final long STICK_IDLE_TIMEOUT_MS = 350L;
-    private static volatile long lastStickUpdateMs = 0L;
-
     private static final Map<Integer, float[]> BUTTON_COORDS = new HashMap<>();
     private static final Handler HANDLER = new Handler(Looper.getMainLooper());
     private static final Map<Integer, Runnable> ACTIVE_HOLDS = new ConcurrentHashMap<>();
@@ -27,11 +24,13 @@ public final class TouchMapper {
     private static final float STICK_MAX_RADIUS = 130f;
     private static final float STICK_DEADZONE = 0.20f;
     private static final float STICK_MIN_STEP_PX = 8f;
-    private static final long STICK_STEP_DURATION_MS = 180L;
-    private static final long STICK_STEP_INTERVAL_MS = 160L;
+    private static final long STICK_STEP_DURATION_MS = 220L;
+    private static final long STICK_STEP_INTERVAL_MS = 240L;
+    private static final long STICK_IDLE_TIMEOUT_MS = 350L;
 
     private static volatile float currentStickX = 0f;
     private static volatile float currentStickY = 0f;
+    private static volatile long lastStickUpdateMs = 0L;
     private static volatile boolean stickActive = false;
 
     private static float activeTouchX = STICK_CENTER_X;
@@ -41,11 +40,18 @@ public final class TouchMapper {
         @Override
         public void run() {
             JoystickTouchService svc = JoystickTouchService.getInstance();
+            long now = System.currentTimeMillis();
+
+            if (svc == null || !stickActive || (now - lastStickUpdateMs) > STICK_IDLE_TIMEOUT_MS) {
+                resetStickTouch();
+                return;
+            }
+
             float ax = currentStickX;
             float ay = currentStickY;
-
             float mag = (float) Math.hypot(ax, ay);
-            if (svc == null || mag < STICK_DEADZONE) {
+
+            if (mag < STICK_DEADZONE) {
                 resetStickTouch();
                 return;
             }
@@ -57,7 +63,6 @@ public final class TouchMapper {
             float desiredX = STICK_CENTER_X + (normX * STICK_MAX_RADIUS * clampedMag);
             float desiredY = STICK_CENTER_Y + (normY * STICK_MAX_RADIUS * clampedMag);
 
-            // Avance gradual desde la posición actual hacia el objetivo del stick
             float dx = desiredX - activeTouchX;
             float dy = desiredY - activeTouchY;
             float dist = (float) Math.hypot(dx, dy);
@@ -90,13 +95,6 @@ public final class TouchMapper {
         }
     };
 
-    private static void resetStickTouch() {
-        stickActive = false;
-        HANDLER.removeCallbacks(STICK_STEP_RUNNABLE);
-        activeTouchX = STICK_CENTER_X;
-        activeTouchY = STICK_CENTER_Y;
-    }
-
     static {
         BUTTON_COORDS.put(1, new float[]{112f, 212f});
         BUTTON_COORDS.put(2, new float[]{1345f, 489f});
@@ -111,6 +109,15 @@ public final class TouchMapper {
     }
 
     private TouchMapper() {
+    }
+
+    private static void resetStickTouch() {
+        stickActive = false;
+        currentStickX = 0f;
+        currentStickY = 0f;
+        HANDLER.removeCallbacks(STICK_STEP_RUNNABLE);
+        activeTouchX = STICK_CENTER_X;
+        activeTouchY = STICK_CENTER_Y;
     }
 
     public static Integer keyCodeToSlot(int keyCode) {
@@ -150,6 +157,7 @@ public final class TouchMapper {
     public static void updateStick(float xAxis, float yAxis) {
         currentStickX = xAxis;
         currentStickY = yAxis;
+        lastStickUpdateMs = System.currentTimeMillis();
 
         float mag = (float) Math.hypot(xAxis, yAxis);
         if (mag >= STICK_DEADZONE) {
