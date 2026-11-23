@@ -104,4 +104,21 @@ public class JoystickTouchService extends AccessibilityService {
             dispatchGesture(builder.build(), null, null);
         });
     }
+
+
+    @Override
+    protected boolean onKeyEvent(KeyEvent event) {
+        InputDevice dev = event.getDevice();
+        if (dev != null && dev.isExternal()
+                && event.getAction() == KeyEvent.ACTION_DOWN
+                && event.getRepeatCount() == 0) {
+    
+            Integer slot = TouchMapper.keyCodeToSlot(event.getKeyCode());
+            if (slot != null) {
+                TouchMapper.triggerTap(slot, KeyEvent.keyCodeToString(event.getKeyCode()));
+                return true;
+            }
+        }
+        return super.onKeyEvent(event);
+    }
 }
