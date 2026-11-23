@@ -11,6 +11,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class TouchMapper {
 
+    private static final long STICK_IDLE_TIMEOUT_MS = 350L;
+    private static volatile long lastStickUpdateMs = 0L;
+
     private static final Map<Integer, float[]> BUTTON_COORDS = new HashMap<>();
     private static final Handler HANDLER = new Handler(Looper.getMainLooper());
     private static final Map<Integer, Runnable> ACTIVE_HOLDS = new ConcurrentHashMap<>();
