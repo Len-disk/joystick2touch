@@ -12,30 +12,71 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class TouchMapper {
 
     private static final Map<Integer, float[]> BUTTON_COORDS = new HashMap<>();
-    private static final Handler HOLD_HANDLER = new Handler(Looper.getMainLooper());
+    private static final Handler HANDLER = new Handler(Looper.getMainLooper());
     private static final Map<Integer, Runnable> ACTIVE_HOLDS = new ConcurrentHashMap<>();
 
     private static final long HOLD_PULSE_DURATION_MS = 160L;
     private static final long HOLD_REPEAT_INTERVAL_MS = 130L;
 
+    // Centro y radio de desplazamiento del stick en HUD_2.jpg
+    private static final float STICK_CENTER_X = 270f;
+    private static final float STICK_CENTER_Y = 539f;
+    private static final float STICK_MAX_RADIUS = 110f;
+    private static final float STICK_DEADZONE = 0.20f;
+    private static final long STICK_REPEAT_MS = 120L;
+
+    private static volatile float currentStickX = 0f;
+    private static volatile float currentStickY = 0f;
+    private static volatile boolean stickLoopRunning = false;
+
+    private static final Runnable STICK_RUNNABLE = new Runnable() {
+        @Override
+        public void run() {
+            JoystickTouchService svc = JoystickTouchService.getInstance();
+            float ax = currentStickX;
+            float ay = currentStickY;
+
+            float mag = (float) Math.hypot(ax, ay);
+            if (svc == null || mag < STICK_DEADZONE) {
+                stickLoopRunning = false;
+                return;
+            }
+
+            // Normalizar si la magnitud supera 1.0
+            float normX = mag > 1f ? ax / mag : ax;
+            float normY = mag > 1f ? ay / mag : ay;
+            float clampedMag = Math.min(1f, mag);
+
+            float targetX = STICK_CENTER_X + (normX * STICK_MAX_RADIUS * clampedMag);
+            float targetY = STICK_CENTER_Y + (normY * STICK_MAX_RADIUS * clampedMag);
+
+            svc.swipe(
+                    STICK_CENTER_X,
+                    STICK_CENTER_Y,
+                    targetX,
+                    targetY,
+                    140L,
+                    String.format(Locale.US, "STICK (%.0f, %.0f)", targetX, targetY)
+            );
+
+            HANDLER.postDelayed(this, STICK_REPEAT_MS);
+        }
+    };
+
     static {
-        // Coordenadas actualizadas de HUD_android-10.jpg
-        BUTTON_COORDS.put(1, new float[]{112f, 212f});   //[cite: 3]
-        BUTTON_COORDS.put(2, new float[]{1345f, 489f}); //[cite: 3]
-        BUTTON_COORDS.put(3, new float[]{1253f, 593f}); //[cite: 3]
-        BUTTON_COORDS.put(4, new float[]{112f, 119f});   //[cite: 3]
-        BUTTON_COORDS.put(5, new float[]{1387f, 420f}); //[cite: 3]
-        BUTTON_COORDS.put(6, new float[]{1387f, 227f}); //[cite: 3]
-        BUTTON_COORDS.put(7, new float[]{599f, 668f});  //[cite: 3]
-        BUTTON_COORDS.put(8, new float[]{928f, 668f});  //[cite: 3]
-        BUTTON_COORDS.put(10, new float[]{112f, 23f});   //[cite: 3]
+        BUTTON_COORDS.put(1, new float[]{112f, 212f});
+        BUTTON_COORDS.put(2, new float[]{1345f, 489f});
+        BUTTON_COORDS.put(3, new float[]{1253f, 593f});
+        BUTTON_COORDS.put(4, new float[]{1188f, 489f});
+        BUTTON_COORDS.put(5, new float[]{1387f, 420f});
+        BUTTON_COORDS.put(6, new float[]{1387f, 227f});
+        BUTTON_COORDS.put(7, new float[]{599f, 668f});
+        BUTTON_COORDS.put(8, new float[]{928f, 668f});
+        BUTTON_COORDS.put(9, new float[]{112f, 119f});
+        BUTTON_COORDS.put(10, new float[]{112f, 23f});
     }
 
     private TouchMapper() {
-    }
-
-    public static float[] getStickCenter() {
-        return new float[]{270f, 539f}; //[cite: 3]
     }
 
     public static Integer keyCodeToSlot(int keyCode) {
@@ -63,10 +104,28 @@ public final class TouchMapper {
         if (keyCode == KeyEvent.KEYCODE_BUTTON_8 || keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
             return 8;
         }
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_9 || keyCode == KeyEvent.KEYCODE_BUTTON_SELECT) {
+            return 9;
+        }
         if (keyCode == KeyEvent.KEYCODE_BUTTON_10 || keyCode == KeyEvent.KEYCODE_BUTTON_START) {
             return 10;
         }
         return null;
+    }
+
+    public static void updateStick(float xAxis, float yAxis) {
+        currentStickX = xAxis;
+        currentStickY = yAxis;
+
+        float mag = (float) Math.hypot(xAxis, yAxis);
+        if (mag >= STICK_DEADZONE && !stickLoopRunning) {
+            stickLoopRunning = true;
+            HANDLER.removeCallbacks(STICK_RUNNABLE);
+            HANDLER.post(STICK_RUNNABLE);
+        } else if (mag < STICK_DEADZONE) {
+            stickLoopRunning = false;
+            HANDLER.removeCallbacks(STICK_RUNNABLE);
+        }
     }
 
     public static boolean startHold(final int keyCode, final int slotNumber, final String sourceLabel) {
@@ -77,8 +136,7 @@ public final class TouchMapper {
 
         stopHold(keyCode);
 
-        final JoystickTouchService svc = JoystickTouchService.getInstance();
-        if (svc == null) {
+        if (JoystickTouchService.getInstance() == null) {
             return false;
         }
 
@@ -94,26 +152,28 @@ public final class TouchMapper {
                     return;
                 }
                 currentSvc.tapAt(coords[0], coords[1], HOLD_PULSE_DURATION_MS, label);
-                HOLD_HANDLER.postDelayed(this, HOLD_REPEAT_INTERVAL_MS);
+                HANDLER.postDelayed(this, HOLD_REPEAT_INTERVAL_MS);
             }
         };
 
         ACTIVE_HOLDS.put(keyCode, pulseRunnable);
-        HOLD_HANDLER.post(pulseRunnable);
+        HANDLER.post(pulseRunnable);
         return true;
     }
 
     public static void stopHold(int keyCode) {
         Runnable existing = ACTIVE_HOLDS.remove(keyCode);
         if (existing != null) {
-            HOLD_HANDLER.removeCallbacks(existing);
+            HANDLER.removeCallbacks(existing);
         }
     }
 
     public static void stopAllHolds() {
         for (Runnable r : ACTIVE_HOLDS.values()) {
-            HOLD_HANDLER.removeCallbacks(r);
+            HANDLER.removeCallbacks(r);
         }
         ACTIVE_HOLDS.clear();
+        stickLoopRunning = false;
+        HANDLER.removeCallbacks(STICK_RUNNABLE);
     }
 }
