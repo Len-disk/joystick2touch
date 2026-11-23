@@ -176,4 +176,24 @@ public final class TouchMapper {
         stickLoopRunning = false;
         HANDLER.removeCallbacks(STICK_RUNNABLE);
     }
+
+    public static float[] getButtonCoords(int slotNumber) {
+        return BUTTON_COORDS.get(slotNumber);
+    }
+
+    public static boolean triggerSingleTap(int slotNumber, String sourceLabel) {
+        float[] coords = BUTTON_COORDS.get(slotNumber);
+        if (coords == null) {
+            return false;
+        }
+        JoystickTouchService svc = JoystickTouchService.getInstance();
+        if (svc == null) {
+            return false;
+        }
+        svc.tapAt(coords[0], coords[1], 70L,
+                String.format(Locale.US, "btn %d (%.0f, %.0f) [%s]",
+                        slotNumber, coords[0], coords[1], sourceLabel));
+        return true;
+    }
+    
 }
