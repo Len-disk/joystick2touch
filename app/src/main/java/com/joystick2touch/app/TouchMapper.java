@@ -23,10 +23,13 @@ public final class TouchMapper {
     private static final float STICK_CENTER_Y = 539f;
     private static final float STICK_MAX_RADIUS = 130f;
     private static final float STICK_DEADZONE = 0.20f;
-    private static final float STICK_MIN_STEP_PX = 8f;
-    private static final long STICK_STEP_DURATION_MS = 220L;
-    private static final long STICK_STEP_INTERVAL_MS = 240L;
-    private static final long STICK_IDLE_TIMEOUT_MS = 350L;
+    private static final float STICK_MIN_STEP_PX = 4f;
+    private static final long STICK_STEP_DURATION_MS = 90L;
+    private static final long STICK_STEP_INTERVAL_MS = 100L;
+    private static final long STICK_IDLE_TIMEOUT_MS = 300L;
+
+
+    
 
     private static volatile float currentStickX = 0f;
     private static volatile float currentStickY = 0f;
@@ -67,16 +70,8 @@ public final class TouchMapper {
             float dy = desiredY - activeTouchY;
             float dist = (float) Math.hypot(dx, dy);
 
-            float nextX;
-            float nextY;
-            if (dist > STICK_MIN_STEP_PX) {
-                float stepRatio = Math.min(1f, 24f / dist);
-                nextX = activeTouchX + (dx * stepRatio);
-                nextY = activeTouchY + (dy * stepRatio);
-            } else {
-                nextX = desiredX;
-                nextY = desiredY;
-            }
+            float nextX = desiredX;
+            float nextY = desiredY;
 
             svc.swipe(
                     activeTouchX,
