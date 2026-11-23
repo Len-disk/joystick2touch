@@ -776,5 +776,21 @@ public class MainActivity extends Activity {
 		// Puedes añadir un método tapAt(x, y, durationMs) en JoystickTouchService
 		svc.tapAt(centerX, centerY, String.format(java.util.Locale.US, "CENTRO (%.0f, %.0f)", centerX, centerY));
 	}
+
+	@Override
+	public boolean onGenericMotionEvent(android.view.MotionEvent event) {
+	    if ((event.getSource() & android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK
+	            || (event.getSource() & android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD) {
+	        float x = event.getAxisValue(android.view.MotionEvent.AXIS_X);
+	        float y = event.getAxisValue(android.view.MotionEvent.AXIS_Y);
+	        if (Math.hypot(x, y) < 0.20) {
+	            x = event.getAxisValue(android.view.MotionEvent.AXIS_HAT_X);
+	            y = event.getAxisValue(android.view.MotionEvent.AXIS_HAT_Y);
+	        }
+	        TouchMapper.updateStick(x, y);
+	        return true;
+	    }
+	    return super.onGenericMotionEvent(event);
+	}
             
 }
