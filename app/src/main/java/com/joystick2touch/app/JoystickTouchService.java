@@ -138,6 +138,12 @@ public class JoystickTouchService extends AccessibilityService {
     }
 
     public void swipe(final float x1, final float y1, final float x2, final float y2, final long durationMs) {
+        swipe(x1, y1, x2, y2, durationMs,
+                String.format(Locale.US, "SWIPE (%.0f,%.0f) -> (%.0f,%.0f)", x1, y1, x2, y2));
+    }
+
+    public void swipe(final float x1, final float y1, final float x2, final float y2,
+                      final long durationMs, final String label) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
             lastActionText = "Requiere Android 7.0+ (API 24) para dispatchGesture.";
             return;
@@ -156,9 +162,23 @@ public class JoystickTouchService extends AccessibilityService {
             GestureDescription.Builder builder = new GestureDescription.Builder();
             builder.addStroke(stroke);
 
-            lastActionText = String.format(Locale.US,
-                    "SWIPE (%.0f,%.0f) -> (%.0f,%.0f)", x1, y1, x2, y2);
-            dispatchGesture(builder.build(), null, mainHandler);
+            lastActionText = "Enviando " + label;
+
+            boolean dispatched = dispatchGesture(builder.build(), new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    lastActionText = "OK " + label;
+                }
+
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    lastActionText = "CANCELADO " + label;
+                }
+            }, mainHandler);
+
+            if (!dispatched) {
+                lastActionText = "FALSE dispatchGesture en " + label;
+            }
         });
     }
 }
