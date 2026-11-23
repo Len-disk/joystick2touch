@@ -4,9 +4,14 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
 import android.graphics.Path;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.InputDevice;
+import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
+
+import java.util.Locale;
 
 public class JoystickTouchService extends AccessibilityService {
 
@@ -36,7 +41,7 @@ public class JoystickTouchService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // No requerimos eventos de ventana para disparar gestos.
+        // Sin uso en esta prueba.
     }
 
     @Override
@@ -61,64 +66,59 @@ public class JoystickTouchService extends AccessibilityService {
         super.onDestroy();
     }
 
+    @Override
+    protected boolean onKeyEvent(KeyEvent event) {
+        InputDevice dev = event.getDevice();
+        if (dev != null && dev.isExternal()) {
+            Integer slot = TouchMapper.keyCodeToSlot(event.getKeyCode());
+            if (slot != null) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                    TouchMapper.triggerTap(slot, KeyEvent.keyCodeToString(event.getKeyCode()));
+                }
+                // Consumir el evento del botón mapeado para no interferir con la app destino
+                return true;
+            }
+        }
+        return super.onKeyEvent(event);
+    }
+
     public void tapAt(final float x, final float y) {
+        tapAt(x, y, String.format(Locale.US, "(%.1f, %.1f)", x, y));
+    }
+
+    public void tapAt(final float x, final float y, final String label) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            lastActionText = "Requiere Android 7.0+ (API 24) para dispatchGesture.";
+            return;
+        }
+
         mainHandler.post(() -> {
             Path path = new Path();
             path.moveTo(x, y);
 
             GestureDescription.StrokeDescription stroke =
-                    new GestureDescription.StrokeDescription(path, 0L, 40L);
+                    new GestureDescription.StrokeDescription(path, 0L, 70L);
 
             GestureDescription.Builder builder = new GestureDescription.Builder();
             builder.addStroke(stroke);
 
-            lastActionText = String.format("TAP en (%.1f, %.1f)", x, y);
+            lastActionText = "Enviando " + label;
 
-            dispatchGesture(builder.build(), new GestureResultCallback() {
+            boolean dispatched = dispatchGesture(builder.build(), new GestureResultCallback() {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
-                    lastActionText = String.format("OK TAP (%.1f, %.1f)", x, y);
+                    lastActionText = "OK " + label;
                 }
 
                 @Override
                 public void onCancelled(GestureDescription gestureDescription) {
-                    lastActionText = String.format("CANCELADO TAP (%.1f, %.1f)", x, y);
+                    lastActionText = "CANCELADO " + label;
                 }
-            }, null);
-        });
-    }
+            }, mainHandler);
 
-    public void swipe(final float x1, final float y1, final float x2, final float y2, final long durationMs) {
-        mainHandler.post(() -> {
-            Path path = new Path();
-            path.moveTo(x1, y1);
-            path.lineTo(x2, y2);
-
-            GestureDescription.StrokeDescription stroke =
-                    new GestureDescription.StrokeDescription(path, 0L, Math.max(20L, durationMs));
-
-            GestureDescription.Builder builder = new GestureDescription.Builder();
-            builder.addStroke(stroke);
-
-            lastActionText = String.format("SWIPE (%.0f,%.0f) -> (%.0f,%.0f)", x1, y1, x2, y2);
-            dispatchGesture(builder.build(), null, null);
-        });
-    }
-
-
-    @Override
-    protected boolean onKeyEvent(KeyEvent event) {
-        InputDevice dev = event.getDevice();
-        if (dev != null && dev.isExternal()
-                && event.getAction() == KeyEvent.ACTION_DOWN
-                && event.getRepeatCount() == 0) {
-    
-            Integer slot = TouchMapper.keyCodeToSlot(event.getKeyCode());
-            if (slot != null) {
-                TouchMapper.triggerTap(slot, KeyEvent.keyCodeToString(event.getKeyCode()));
-                return true;
+            if (!dispatched) {
+                lastActionText = "FALSE dispatchGesture en " + label;
             }
-        }
-        return super.onKeyEvent(event);
+        });
     }
 }
