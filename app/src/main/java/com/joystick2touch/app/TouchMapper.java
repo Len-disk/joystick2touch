@@ -21,9 +21,11 @@ public final class TouchMapper {
     // Centro y radio de desplazamiento del stick en HUD_2.jpg
     private static final float STICK_CENTER_X = 270f;
     private static final float STICK_CENTER_Y = 539f;
-    private static final float STICK_MAX_RADIUS = 110f;
+    private static final float STICK_MAX_RADIUS = 130f;
     private static final float STICK_DEADZONE = 0.20f;
-    private static final long STICK_REPEAT_MS = 120L;
+    // private static final long STICK_REPEAT_MS = 120L;
+    private static final long STICK_PULSE_DURATION_MS = 220L;
+    private static final long STICK_REPEAT_INTERVAL_MS = 240L;
 
     private static volatile float currentStickX = 0f;
     private static volatile float currentStickY = 0f;
@@ -55,11 +57,11 @@ public final class TouchMapper {
                     STICK_CENTER_Y,
                     targetX,
                     targetY,
-                    140L,
+                    STICK_PULSE_DURATION_MS,
                     String.format(Locale.US, "STICK (%.0f, %.0f)", targetX, targetY)
             );
 
-            HANDLER.postDelayed(this, STICK_REPEAT_MS);
+            HANDLER.postDelayed(this, STICK_REPEAT_INTERVAL_MS);
         }
     };
 
