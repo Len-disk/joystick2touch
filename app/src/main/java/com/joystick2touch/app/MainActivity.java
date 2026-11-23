@@ -774,7 +774,7 @@ public class MainActivity extends Activity {
 				dm.widthPixels, dm.heightPixels, centerX, centerY));
 
 		// Puedes añadir un método tapAt(x, y, durationMs) en JoystickTouchService
-		svc.swipe(centerX, centerY, centerX, centerY, 80L);
+		svc.tapAt(centerX, centerY, String.format(java.util.Locale.US, "CENTRO (%.0f, %.0f)", centerX, centerY));
 	}
             
 }
