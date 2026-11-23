@@ -18,20 +18,23 @@ public final class TouchMapper {
     private static final long HOLD_PULSE_DURATION_MS = 160L;
     private static final long HOLD_REPEAT_INTERVAL_MS = 130L;
 
-    // Centro y radio de desplazamiento del stick en HUD_2.jpg
+    // Centro y radio del stick en HUD_2.jpg
     private static final float STICK_CENTER_X = 270f;
     private static final float STICK_CENTER_Y = 539f;
     private static final float STICK_MAX_RADIUS = 130f;
     private static final float STICK_DEADZONE = 0.20f;
-    // private static final long STICK_REPEAT_MS = 120L;
-    private static final long STICK_PULSE_DURATION_MS = 220L;
-    private static final long STICK_REPEAT_INTERVAL_MS = 240L;
+    private static final float STICK_MIN_STEP_PX = 8f;
+    private static final long STICK_STEP_DURATION_MS = 180L;
+    private static final long STICK_STEP_INTERVAL_MS = 160L;
 
     private static volatile float currentStickX = 0f;
     private static volatile float currentStickY = 0f;
-    private static volatile boolean stickLoopRunning = false;
+    private static volatile boolean stickActive = false;
 
-    private static final Runnable STICK_RUNNABLE = new Runnable() {
+    private static float activeTouchX = STICK_CENTER_X;
+    private static float activeTouchY = STICK_CENTER_Y;
+
+    private static final Runnable STICK_STEP_RUNNABLE = new Runnable() {
         @Override
         public void run() {
             JoystickTouchService svc = JoystickTouchService.getInstance();
@@ -40,30 +43,56 @@ public final class TouchMapper {
 
             float mag = (float) Math.hypot(ax, ay);
             if (svc == null || mag < STICK_DEADZONE) {
-                stickLoopRunning = false;
+                resetStickTouch();
                 return;
             }
 
-            // Normalizar si la magnitud supera 1.0
             float normX = mag > 1f ? ax / mag : ax;
             float normY = mag > 1f ? ay / mag : ay;
             float clampedMag = Math.min(1f, mag);
 
-            float targetX = STICK_CENTER_X + (normX * STICK_MAX_RADIUS * clampedMag);
-            float targetY = STICK_CENTER_Y + (normY * STICK_MAX_RADIUS * clampedMag);
+            float desiredX = STICK_CENTER_X + (normX * STICK_MAX_RADIUS * clampedMag);
+            float desiredY = STICK_CENTER_Y + (normY * STICK_MAX_RADIUS * clampedMag);
+
+            // Avance gradual desde la posición actual hacia el objetivo del stick
+            float dx = desiredX - activeTouchX;
+            float dy = desiredY - activeTouchY;
+            float dist = (float) Math.hypot(dx, dy);
+
+            float nextX;
+            float nextY;
+            if (dist > STICK_MIN_STEP_PX) {
+                float stepRatio = Math.min(1f, 24f / dist);
+                nextX = activeTouchX + (dx * stepRatio);
+                nextY = activeTouchY + (dy * stepRatio);
+            } else {
+                nextX = desiredX;
+                nextY = desiredY;
+            }
 
             svc.swipe(
-                    STICK_CENTER_X,
-                    STICK_CENTER_Y,
-                    targetX,
-                    targetY,
-                    STICK_PULSE_DURATION_MS,
-                    String.format(Locale.US, "STICK (%.0f, %.0f)", targetX, targetY)
+                    activeTouchX,
+                    activeTouchY,
+                    nextX,
+                    nextY,
+                    STICK_STEP_DURATION_MS,
+                    String.format(Locale.US, "STICK (%.0f, %.0f) -> (%.0f, %.0f)",
+                            activeTouchX, activeTouchY, nextX, nextY)
             );
 
-            HANDLER.postDelayed(this, STICK_REPEAT_INTERVAL_MS);
+            activeTouchX = nextX;
+            activeTouchY = nextY;
+
+            HANDLER.postDelayed(this, STICK_STEP_INTERVAL_MS);
         }
     };
+
+    private static void resetStickTouch() {
+        stickActive = false;
+        HANDLER.removeCallbacks(STICK_STEP_RUNNABLE);
+        activeTouchX = STICK_CENTER_X;
+        activeTouchY = STICK_CENTER_Y;
+    }
 
     static {
         BUTTON_COORDS.put(1, new float[]{112f, 212f});
@@ -120,13 +149,16 @@ public final class TouchMapper {
         currentStickY = yAxis;
 
         float mag = (float) Math.hypot(xAxis, yAxis);
-        if (mag >= STICK_DEADZONE && !stickLoopRunning) {
-            stickLoopRunning = true;
-            HANDLER.removeCallbacks(STICK_RUNNABLE);
-            HANDLER.post(STICK_RUNNABLE);
-        } else if (mag < STICK_DEADZONE) {
-            stickLoopRunning = false;
-            HANDLER.removeCallbacks(STICK_RUNNABLE);
+        if (mag >= STICK_DEADZONE) {
+            if (!stickActive) {
+                stickActive = true;
+                activeTouchX = STICK_CENTER_X;
+                activeTouchY = STICK_CENTER_Y;
+                HANDLER.removeCallbacks(STICK_STEP_RUNNABLE);
+                HANDLER.post(STICK_STEP_RUNNABLE);
+            }
+        } else {
+            resetStickTouch();
         }
     }
 
@@ -175,8 +207,7 @@ public final class TouchMapper {
             HANDLER.removeCallbacks(r);
         }
         ACTIVE_HOLDS.clear();
-        stickLoopRunning = false;
-        HANDLER.removeCallbacks(STICK_RUNNABLE);
+        resetStickTouch();
     }
 
     public static float[] getButtonCoords(int slotNumber) {
@@ -197,5 +228,4 @@ public final class TouchMapper {
                         slotNumber, coords[0], coords[1], sourceLabel));
         return true;
     }
-    
 }
