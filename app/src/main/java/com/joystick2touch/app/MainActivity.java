@@ -181,10 +181,23 @@ public class MainActivity extends Activity {
         });
         root.addView(openSettingsBtn);
 
-        Button testTapBtn = new Button(this);
-        testTapBtn.setText("Probar Touch en Button 3 (772, 423)");
-        testTapBtn.setOnClickListener(v -> triggerVirtualTapForSlot(3, "TEST_BTN"));
-        root.addView(testTapBtn);
+        // En createInterface():
+    Button testTapBtn = new Button(this);
+    float[] btn3 = TouchMapper.getButtonCoords(3);
+    if (btn3 != null) {
+        testTapBtn.setText(String.format(Locale.US,
+                "Probar Touch en Button 3 (%.0f, %.0f)", btn3[0], btn3[1]));
+    } else {
+        testTapBtn.setText("Probar Touch en Button 3");
+    }
+    testTapBtn.setOnClickListener(v -> {
+        TouchMapper.triggerSingleTap(3, "TEST_BTN");
+        handler.post(() -> {
+            updateServiceStatus();
+            log("TEST_BTN -> slot 3");
+        });
+    });
+    root.addView(testTapBtn);
 
         Button refreshBtn = new Button(this);
         refreshBtn.setText("Actualizar y conectar Xbox 360 USB");
@@ -527,12 +540,15 @@ public class MainActivity extends Activity {
         lastXboxButtonsMask = currentMask;
 
         if (newlyPressed != 0) {
-            if ((newlyPressed & 0x2000) != 0) triggerVirtualTapForSlot(2, "XBOX_B");
-            if ((newlyPressed & 0x4000) != 0) triggerVirtualTapForSlot(3, "XBOX_X");
-            if ((newlyPressed & 0x0100) != 0) triggerVirtualTapForSlot(5, "XBOX_LB");
-            if ((newlyPressed & 0x0200) != 0) triggerVirtualTapForSlot(6, "XBOX_RB");
-            if ((newlyPressed & 0x0020) != 0) triggerVirtualTapForSlot(7, "XBOX_BACK");
-            if ((newlyPressed & 0x0010) != 0) triggerVirtualTapForSlot(8, "XBOX_START");
+            if ((newlyPressed & 0x1000) != 0) TouchMapper.triggerSingleTap(1, "XBOX_A");
+            if ((newlyPressed & 0x2000) != 0) TouchMapper.triggerSingleTap(2, "XBOX_B");
+            if ((newlyPressed & 0x4000) != 0) TouchMapper.triggerSingleTap(3, "XBOX_X");
+            if ((newlyPressed & 0x8000) != 0) TouchMapper.triggerSingleTap(4, "XBOX_Y");
+            if ((newlyPressed & 0x0100) != 0) TouchMapper.triggerSingleTap(5, "XBOX_LB");
+            if ((newlyPressed & 0x0200) != 0) TouchMapper.triggerSingleTap(6, "XBOX_RB");
+            if ((newlyPressed & 0x0020) != 0) TouchMapper.triggerSingleTap(7, "XBOX_BACK");
+            if ((newlyPressed & 0x0010) != 0) TouchMapper.triggerSingleTap(8, "XBOX_START");
+            // Ajusta las máscaras de botones 9 y 10 si tu mando reporta otros bits
         }
 
         StringBuilder buttons = new StringBuilder();
@@ -561,6 +577,8 @@ public class MainActivity extends Activity {
         short ly = bb.getShort();
         short rx = bb.getShort();
         short ry = bb.getShort();
+
+        TouchMapper.updateStick(lx / 32767f, ly / 32767f);
 
         StringBuilder hex = new StringBuilder();
         int shown = Math.min(len, 20);
@@ -683,6 +701,14 @@ public class MainActivity extends Activity {
         if (isControllerSource(event.getSource())
                 && event.getAction() == MotionEvent.ACTION_MOVE) {
 
+            float x = event.getAxisValue(MotionEvent.AXIS_X);
+            float y = event.getAxisValue(MotionEvent.AXIS_Y);
+            if (Math.hypot(x, y) < 0.20) {
+                x = event.getAxisValue(MotionEvent.AXIS_HAT_X);
+                y = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
+            }
+            TouchMapper.updateStick(x, y);
+
             StringBuilder values = new StringBuilder();
             values.append("Dispositivo: ")
                     .append(event.getDevice() != null
@@ -777,20 +803,5 @@ public class MainActivity extends Activity {
 		svc.tapAt(centerX, centerY, String.format(java.util.Locale.US, "CENTRO (%.0f, %.0f)", centerX, centerY));
 	}
 
-	@Override
-	public boolean onGenericMotionEvent(android.view.MotionEvent event) {
-	    if ((event.getSource() & android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK
-	            || (event.getSource() & android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD) {
-	        float x = event.getAxisValue(android.view.MotionEvent.AXIS_X);
-	        float y = event.getAxisValue(android.view.MotionEvent.AXIS_Y);
-	        if (Math.hypot(x, y) < 0.20) {
-	            x = event.getAxisValue(android.view.MotionEvent.AXIS_HAT_X);
-	            y = event.getAxisValue(android.view.MotionEvent.AXIS_HAT_Y);
-	        }
-	        TouchMapper.updateStick(x, y);
-	        return true;
-	    }
-	    return super.onGenericMotionEvent(event);
-	}
             
 }
