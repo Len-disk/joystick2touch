@@ -99,18 +99,20 @@ public class JoystickTouchService extends AccessibilityService {
         tapAt(x, y, 70L, label);
     }
 
-    public void tapAt(final float x, final float y, final String label) {
+    public void tapAt(final float x, final float y, final long durationMs, final String label) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
             lastActionText = "Requiere Android 7.0+ (API 24) para dispatchGesture.";
             return;
         }
+
+        final long safeDuration = Math.max(20L, durationMs);
 
         mainHandler.post(() -> {
             Path path = new Path();
             path.moveTo(x, y);
 
             GestureDescription.StrokeDescription stroke =
-                    new GestureDescription.StrokeDescription(path, 0L, Math.max(20L, durationMs));
+                    new GestureDescription.StrokeDescription(path, 0L, safeDuration);
 
             GestureDescription.Builder builder = new GestureDescription.Builder();
             builder.addStroke(stroke);
@@ -132,6 +134,31 @@ public class JoystickTouchService extends AccessibilityService {
             if (!dispatched) {
                 lastActionText = "FALSE dispatchGesture en " + label;
             }
+        });
+    }
+
+    public void swipe(final float x1, final float y1, final float x2, final float y2, final long durationMs) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            lastActionText = "Requiere Android 7.0+ (API 24) para dispatchGesture.";
+            return;
+        }
+
+        final long safeDuration = Math.max(20L, durationMs);
+
+        mainHandler.post(() -> {
+            Path path = new Path();
+            path.moveTo(x1, y1);
+            path.lineTo(x2, y2);
+
+            GestureDescription.StrokeDescription stroke =
+                    new GestureDescription.StrokeDescription(path, 0L, safeDuration);
+
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(stroke);
+
+            lastActionText = String.format(Locale.US,
+                    "SWIPE (%.0f,%.0f) -> (%.0f,%.0f)", x1, y1, x2, y2);
+            dispatchGesture(builder.build(), null, mainHandler);
         });
     }
 }
